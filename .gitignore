@@ -1,0 +1,23 @@
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+crash.log
+crash.*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# memtier raw progress logs (per-second stdout captures, can be large)
+*.log
+
+# editor / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
