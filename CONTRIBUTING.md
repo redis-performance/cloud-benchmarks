@@ -4,13 +4,53 @@ We treat this repo as "Open Source" within Redis: anyone who clears the bar belo
 
 ## Local setup
 
-<!-- TODO: fill in repo-specific setup steps -->
+This repo is Terraform + Bash scripts — no build step is required. You need:
+
+- [Terraform](https://developer.hashicorp.com/terraform/install) >= 1.3
+- [Google Cloud SDK](https://cloud.google.com/sdk/docs/install) (`gcloud`) authenticated to a GCP project
+- `redis-cli` and `memtier_benchmark` on the bench client VM (provisioned automatically by the Terraform modules)
+
+Clone and initialise the provider plugins for whichever setup you plan to work on:
 
 ```bash
-# Example — replace with actual steps
-git clone git@github.com:redis-performance/<repo>.git
-cd <repo>
-# install dependencies, build, etc.
+git clone git@github.com:redis-performance/cloud-benchmarks.git
+cd cloud-benchmarks
+
+# Bench client (GCP):
+cd terraform/bench-client-gcp-ubuntu24.04-c2-standard-16/
+terraform init
+
+# GCP Memorystore shared service connection policy (one-time per project/network):
+cd ../gcp-memorystore-shared-scp/
+terraform init
+
+# GCP Memorystore Valkey cluster:
+cd ../gcp-memorystore-valkey-highmem-xlarge-8vcpus-46gb-cluster-mode/
+terraform init
+
+# Redis Cloud Pro subscription (requires env vars below):
+cd ../gcp-redis-cloud-50gb-50k-cluster-oss-api/
+terraform init
+```
+
+**GCP credentials** — authenticate once with Application Default Credentials:
+
+```bash
+gcloud auth application-default login
+```
+
+**Redis Cloud credentials** — the `gcp-redis-cloud-*` modules read two env vars at plan/apply time via `env.sh`:
+
+```bash
+export REDIS_CLOUD_PAYMENT_4DIGITS=<last-4-digits-of-card>
+export REDIS_CLOUD_DEFAULT_PASSWORD=<db-password>
+```
+
+You also need a Redis Cloud [API key](https://redis.io/docs/latest/operate/rc/api/get-started/manage-api-keys/) exported for the Terraform provider:
+
+```bash
+export REDISCLOUD_ACCESS_KEY=<api-account-key>
+export REDISCLOUD_SECRET_KEY=<api-secret-key>
 ```
 
 ## Branch naming
@@ -38,11 +78,21 @@ Example: `feat/add-pipeline-mode`
 
 ## Testing
 
-- All new behaviour must be covered by tests.
-- Existing tests must pass: run the test suite locally before opening a PR.
-- Coverage should not decrease.
+There is no automated test suite — correctness is validated by running the full benchmark end-to-end and inspecting the JSON output.
 
-<!-- TODO: add the exact test command for this repo -->
+Before opening a PR, verify your change manually:
+
+1. Deploy the relevant Terraform module (`terraform apply -var project_id=<your-gcp-project>`).
+2. SSH to the bench client and raise the file-descriptor limit:
+   ```bash
+   ulimit -Sn 65536
+   ```
+3. Run at least one benchmark script against the target cluster, e.g.:
+   ```bash
+   CLUSTER_MODE=1 ./scripts/raw-memtier-string-stair-bench.sh <host> <port> smoke-test 120 0
+   ```
+4. Confirm the script exits cleanly and produces a valid `smoke-test-stair.json`.
+5. Tear down ephemeral infrastructure with `terraform destroy`.
 
 ## Review process
 
